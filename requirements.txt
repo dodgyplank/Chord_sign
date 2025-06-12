@@ -4,3 +4,4 @@ numpy>=1.24.0
 streamlit-extras>=0.3.2
 pygame
 cvzone
+mediapipe>=0.10.0
