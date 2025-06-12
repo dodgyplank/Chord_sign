@@ -1,96 +1,104 @@
-import streamlit as st
 import cv2
-import time
-import threading
-from streamlit_extras.add_vertical_space import add_vertical_space
-from streamlit_webrtc import webrtc_streamer, WebRtcMode
 import pygame.midi
+import time
 from cvzone.HandTrackingModule import HandDetector
-import av
 
 # 🎹 Initialize Pygame MIDI
 pygame.midi.init()
 player = pygame.midi.Output(0)
+
+INSTRUMENTS = {
+    "Acoustic Grand Piano": 0,
+    "Acoustic Guitar": 25,
+    "Violin": 40
+}
 player.set_instrument(0)  # 0 = Acoustic Grand Piano
 
 # 🎐 Initialize Hand Detector
+cap = cv2.VideoCapture(0)
 detector = HandDetector(detectionCon=0.8)
 
-with st.sidebar:
-    st.title('ChordSign')
-    st.markdown('''
-    ## About
-    This app uses opencv and streamlit to detect hand gestures and convert them into musical chords.:
-    - [Streamlit](https://streamlit.io/)
-    - [OpenCV](https://opencv.org/)
-    ''')
-    add_vertical_space(3)
 
-chords = {
+# Notes in C major scale for each finger
+notes = {
     "left": {
-        "thumb": [62, 66, 69],   # D Major (D, F#, A)
-        "index": [64, 67, 71],   # E Minor (E, G, B)
-        "middle": [66, 69, 73],  # F# Minor (F#, A, C#)
-        "ring": [67, 71, 74],    # G Major (G, B, D)
-        "pinky": [69, 73, 76]    # A Major (A, C#, E)
+        "index": 65,   
+        "middle": 64,    
+        "ring": 62,
+        "pinky": 60, 
     },
     "right": {
-        "thumb": [62, 66, 69],   # D Major (D, F#, A)
-        "index": [64, 67, 71],   # E Minor (E, G, B)
-        "middle": [66, 69, 73],  # F# Minor (F#, A, C#)
-        "ring": [67, 71, 74],    # G Major (G, B, D)
-        "pinky": [69, 73, 76]    # A Major (A, C#, E)
+        "index": 67,   
+        "middle": 69,    
+        "ring": 71,
+        "pinky": 72,  
     }
 }
 
-SUSTAIN_TIME = 2.0
-prev_states = {hand: {finger: 0 for finger in chords[hand]} for hand in chords}
+BUFFER_TIME = 0.1
 
-# 🎵 Function to Play a Chord
-def play_chord(chord_notes):
-    for note in chord_notes:
-        player.note_on(note, 127)  # Note on
+# Track Previous States to Stop Chords
+prev_state = (None, None, None) # (Hand, Finger, Note)
 
-# 🎵 Function to Stop a Chord After a Delay
-def stop_chord_after_delay(chord_notes):
-    time.sleep(SUSTAIN_TIME)  # Sustain for specified time
-    for note in chord_notes:
-        player.note_off(note, 127)  # Stop playing
+last_play_times = {}
 
-# Video frame callback function
-def video_frame_callback(frame):
-    global prev_states
-    
-    img = frame.to_ndarray(format="bgr24")
+
+while True:
+    success, img = cap.read()
+    if not success:
+        print("❌ Camera not capturing frames")
+        continue
+
     hands, img = detector.findHands(img, draw=True)
-    
+
     if hands:
         for hand in hands:
             hand_type = "left" if hand["type"] == "Left" else "right"
+            lmList = hand["lmList"]
+            thumb_tip = (lmList[4][0], lmList[4][1])  # Thumb tip coordinates
             fingers = detector.fingersUp(hand)
-            finger_names = ["thumb", "index", "middle", "ring", "pinky"]
+            finger_names = [("index", 8), ("middle", 12), ("ring", 16), ("pinky", 20)]
+            shortest_distance = (None, None)
+
             for i, finger in enumerate(finger_names):
-                if finger in chords[hand_type]:  # Only check assigned chords
-                    if fingers[i] == 1 and prev_states[hand_type][finger] == 0:
-                        play_chord(chords[hand_type][finger])  # Play chord
-                    elif fingers[i] == 0 and prev_states[hand_type][finger] == 1:
-                        threading.Thread(target=stop_chord_after_delay, args=(chords[hand_type][finger],), daemon=True).start()
-                    prev_states[hand_type][finger] = fingers[i]  # Update state
-    else:
-        # If no hands detected, stop all chords after delay
-        for hand in chords:
-            for finger in chords[hand]:
-                threading.Thread(target=stop_chord_after_delay, args=(chords[hand][finger],), daemon=True).start()
-        prev_states = {hand: {finger: 0 for finger in chords[hand]} for hand in chords}
-    
-    return av.VideoFrame.from_ndarray(img, format="bgr24")
+                finger_name, finger_id = finger
+                finger_tip = (lmList[finger_id][0], lmList[finger_id][1])
+                distance = detector.findDistance(thumb_tip, finger_tip)[0]
+                if (shortest_distance[1] is None) or (distance < shortest_distance[1]):
+                    shortest_distance = (finger_name, distance)
 
-webrtc_streamer(
-    key="hand-tracking",
-    mode=WebRtcMode.SENDRECV,
-    video_frame_callback=video_frame_callback,
-    media_stream_constraints={"video": True, "audio": False},
-    async_processing=True,
-)
+            note = notes[hand_type].get(shortest_distance[0])
+            current_state = (hand_type, shortest_distance[0], note) # (Hand, Finger, Note)
+            
+            # If finger is close to the thumb
+            if shortest_distance[1] < 30:  
+                current_time = time.time()     
 
+                # Get last play time for the current note (default to 0 if not played before)
+                last_play_time = last_play_times.get(note, 0)
+                # If no previous state, play the note
+                if prev_state[0] is None or (current_time - last_play_time > BUFFER_TIME):
+                    player.note_on(note, 127)  # Start playing
+                
+                elif prev_state != current_state:
+                    player.note_off(prev_state[2], 127)  # Stop previous note
+                    player.note_on(note, 127)  # Start new note
+
+                prev_state = current_state
+                last_play_times[note] = current_time  # Update last play time for this note
+                    
+
+            # for i, finger in enumerate(finger_names):
+            #     if finger in notes[hand_type]:  # Only check assigned chords
+            #         if fingers[i] == 1 and prev_states[hand_type][finger] == 0:
+            #             threading.Thread(target=play_note, args=(notes[hand_type][finger],), daemon=True).start()  # Play note
+            #         prev_states[hand_type][finger] = fingers[i]  # Update state
+
+    cv2.imshow("Hand Tracking MIDI Chords", cv2.flip(img, 1))
+
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+cap.release()
+cv2.destroyAllWindows()
 pygame.midi.quit()
