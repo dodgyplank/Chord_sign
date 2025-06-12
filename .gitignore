@@ -5,3 +5,7 @@ __pycache__/
 *.log
 *.wav
 *.mp3
+
+# Ignore Python virtual environment directories
+venv/
+.venv/
