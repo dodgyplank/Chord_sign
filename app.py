@@ -36,8 +36,6 @@ INSTRUMENTS = {
 # Initialize session state variables
 if "instrument_name" not in st.session_state:
     st.session_state.instrument_name = list(INSTRUMENTS.keys())[0]
-if "running" not in st.session_state:
-    st.session_state.running = False
 
 # Subheader and column layout for instrument selection
 st.subheader("Select Instrument")
@@ -71,14 +69,14 @@ st.markdown(f"**Selected Instrument:** {instrument_session_name}")
 
 # Get MIDI instrument number
 instrument = INSTRUMENTS[instrument_session_name]
-
+button_label = "Start MIDI Controller" if not st.session_state.running else "Stop MIDI Controller"
 # Button to start/stop the MIDI controller
-if st.button("Start MIDI Controller" if not st.session_state.running else "Stop MIDI Controller"):
+if st.button(button_label):
     if not st.session_state.running:
         st.session_state.running = True
+        start_midi_controller(instrument_id=instrument, show_window=True)
         engine.say(f"{instrument_session_name} MIDI Controller started")
         engine.runAndWait()
-        start_midi_controller(instrument_id=instrument, show_window=True)
     else:
         st.session_state.running = False
         stop_midi_controller()
