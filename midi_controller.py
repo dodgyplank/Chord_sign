@@ -3,9 +3,14 @@ import pygame.midi
 import time
 from cvzone.HandTrackingModule import HandDetector
 
+# global variables for cleanup
+cap = None
+player = None
+
 def start_midi_controller(instrument_id=0, show_window=True):
-    # 🎹 Initialize Pygame MIDI
     global cap, player
+
+    # 🎹 Initialize Pygame MIDI
     pygame.midi.init()
     player = pygame.midi.Output(0)
     player.set_instrument(instrument_id)  # 0 = Acoustic Grand Piano
@@ -13,7 +18,6 @@ def start_midi_controller(instrument_id=0, show_window=True):
     # 🎐 Initialize Hand Detector
     cap = cv2.VideoCapture(0)
     detector = HandDetector(detectionCon=0.8)
-
 
     # Notes in C major scale for each finger
     notes = {
@@ -34,10 +38,8 @@ def start_midi_controller(instrument_id=0, show_window=True):
     BUFFER_TIME = 0.1
 
     # Track Previous States to Stop Chords
-    prev_state = (None, None, None) # (Hand, Finger, Note)
-
+    prev_state = (None, None, None)  # (Hand, Finger, Note)
     last_play_times = {}
-
 
     while True:
         success, img = cap.read()
@@ -64,14 +66,15 @@ def start_midi_controller(instrument_id=0, show_window=True):
                         shortest_distance = (finger_name, distance)
 
                 note = notes[hand_type].get(shortest_distance[0])
-                current_state = (hand_type, shortest_distance[0], note) # (Hand, Finger, Note)
-                
+                current_state = (hand_type, shortest_distance[0], note)  # (Hand, Finger, Note)
+
                 # If finger is close to the thumb
                 if shortest_distance[1] < 30:  
                     current_time = time.time()     
 
                     # Get last play time for the current note (default to 0 if not played before)
                     last_play_time = last_play_times.get(note, 0)
+
                     # If no previous state, play the note
                     if prev_state[0] is None or (current_time - last_play_time > BUFFER_TIME):
                         player.note_on(note, 127)  # Start playing
@@ -82,11 +85,14 @@ def start_midi_controller(instrument_id=0, show_window=True):
 
                     prev_state = current_state
                     last_play_times[note] = current_time  # Update last play time for this note
-                        
-        cv2.imshow("Hand Tracking MIDI Chords", cv2.flip(img, 1))
+
+        if show_window:
+            cv2.imshow("Hand Tracking MIDI Chords", cv2.flip(img, 1))
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
+
+    stop_midi_controller()
 
 
 def stop_midi_controller():
