@@ -1,10 +1,11 @@
-def MidiController(instrument_id=0, show_window=True):
-    import cv2
-    import pygame.midi
-    import time
-    from cvzone.HandTrackingModule import HandDetector
+import cv2
+import pygame.midi
+import time
+from cvzone.HandTrackingModule import HandDetector
 
+def start_midi_controller(instrument_id=0, show_window=True):
     # 🎹 Initialize Pygame MIDI
+    global cap, player
     pygame.midi.init()
     player = pygame.midi.Output(0)
     player.set_instrument(instrument_id)  # 0 = Acoustic Grand Piano
@@ -82,18 +83,17 @@ def MidiController(instrument_id=0, show_window=True):
                     prev_state = current_state
                     last_play_times[note] = current_time  # Update last play time for this note
                         
-
-                # for i, finger in enumerate(finger_names):
-                #     if finger in notes[hand_type]:  # Only check assigned chords
-                #         if fingers[i] == 1 and prev_states[hand_type][finger] == 0:
-                #             threading.Thread(target=play_note, args=(notes[hand_type][finger],), daemon=True).start()  # Play note
-                #         prev_states[hand_type][finger] = fingers[i]  # Update state
-
         cv2.imshow("Hand Tracking MIDI Chords", cv2.flip(img, 1))
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
-    cap.release()
+
+def stop_midi_controller():
+    global cap, player
+    if cap:
+        cap.release()
     cv2.destroyAllWindows()
+    if player:
+        player.close()
     pygame.midi.quit()

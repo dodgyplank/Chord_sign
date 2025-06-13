@@ -1,7 +1,7 @@
 import streamlit as st
 import pyttsx3
 from streamlit_extras.add_vertical_space import add_vertical_space
-from midi_controller import MidiController
+from midi_controller import start_midi_controller, stop_midi_controller
 
 # Start the pyttsx3 text-to-speech engine
 engine = pyttsx3.init()
@@ -61,15 +61,13 @@ instrument = INSTRUMENTS[instrument_session_name]
 if "running" not in st.session_state:
     st.session_state.running = False
 
-def start_midi_controller():
-    MidiController(instrument_id=instrument, show_window=True)
-
 if st.button("Start MIDI Controller" if not st.session_state.running else "Stop MIDI Controller"):
     if not st.session_state.running:
         st.session_state.running = True
-        start_midi_controller()
+        start_midi_controller(instrument_id=instrument, show_window=True)
         engine.say(f"{instrument_session_name} MIDI Controller started")
     else:
         st.session_state.running = False
+        stop_midi_controller()        
         st.write("MIDI Controller stopped.")
         engine.say(f"{instrument_session_name} MIDI Controller stopped")
