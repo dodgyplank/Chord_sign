@@ -18,14 +18,36 @@ st.title("Chord_sign")
 INSTRUMENTS = {
     "🎹 Acoustic Grand Piano": 0,
     "🎸 Acoustic Guitar": 25,
-    "🎻Violin": 40
+    "🎻 Violin": 40
 }
+
+if "instrument" not in st.session_state:
+    st.session_state.instrument_name = list(INSTRUMENTS.keys())[0]
+
+st.subheader("Select Instrument")
+left_spacer, content, right_spacer = st.columns([1, 10, 1]) # Adjust the ratio as needed 
+
+with content: # set main content area
+    col1, col2, col3 = st.columns(3)
+
+#make buttons for each intrument 
+with col1:
+    if st.button("🎹 Acoustic Grand Piano", use_container_width=True):
+        st.session_state.instrument_name = "🎹 Acoustic Grand Piano"
+with col2:
+    if st.button("🎸 Acoustic Guitar", use_container_width=True):
+        st.session_state.instrument_name = "🎸 Acoustic Guitar"
+with col3:
+    if st.button("🎻 Violin", use_container_width=True):
+        st.session_state.instrument_name = "🎻 Violin"
+
+instrument_session_name = st.session_state.instrument_name
+st.markdown(f"**Selected Instrument:** {instrument_session_name}")
+
+instrument = INSTRUMENTS[instrument_session_name]
 
 if "running" not in st.session_state:
     st.session_state.running = False
-
-instrument_name = st.selectbox("Select Instrument" , list(INSTRUMENTS.keys()))
-instrument = INSTRUMENTS[instrument_name]
 
 def start_midi_controller():
     MidiController(instrument_id=instrument, show_window=True)
