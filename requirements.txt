@@ -5,3 +5,4 @@ streamlit-extras>=0.3.2
 pygame
 cvzone
 mediapipe>=0.10.0
+pyttsx3
