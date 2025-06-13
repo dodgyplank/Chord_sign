@@ -4,6 +4,8 @@ from streamlit_extras.add_vertical_space import add_vertical_space
 from midi_controller import start_midi_controller, stop_midi_controller
 
 # Start the pyttsx3 text-to-speech engine
+if "running" not in st.session_state:
+    st.session_state.running = False
 engine = pyttsx3.init()
 
 # Sidebar layout and credits
